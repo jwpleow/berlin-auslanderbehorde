@@ -5,6 +5,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.select import Select
 
+import playsound
+import os
+
 import time
 
 
@@ -74,31 +77,29 @@ def InitialiseSession(driver, config):
     driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
     time.sleep(10)
 
+start_time = time.time()
 config = LoadConfig("config.yaml")
 driver = LaunchChrome()
 
 InitialiseSession(driver, config)
 
 appt_available : bool = False
+ctr = 1
 while (not appt_available):
     # No free slots, try again...
     if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
         time.sleep(20)
         driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+        ctr += 1
+        print("Clicked the button for {} times!", ctr)
     else:
         curr_url = driver.current_url
         if "TerminBuchen/logout" in curr_url: # we've timed out, restart
             InitialiseSession(driver, config)
+            ctr += 1
         else: # the thing disappeared, we've got a slot?!?!?!?!
-            pass
+            playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
+            appt_available = True
 
-
-
-
-
-# print("Done")
-# elem = utilities.WaitForElementID(driver, "xi-cb-1", 20)
-
-
-
-# time.sleep(10000)
+print(f"Got an appointment after only {time.time() - start_time} seconds! ({ctr} tries).")
+           
