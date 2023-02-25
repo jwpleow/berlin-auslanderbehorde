@@ -9,7 +9,7 @@ import playsound
 import os
 
 import time
-
+import datetime
 
 def LoadConfig(filename : str):
     with open(filename, 'r') as f:
@@ -86,20 +86,25 @@ InitialiseSession(driver, config)
 appt_available : bool = False
 ctr = 1
 while (not appt_available):
-    # No free slots, try again...
-    if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
-        time.sleep(20)
-        driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-        ctr += 1
-        print("Clicked the button for {} times!", ctr)
-    else:
-        curr_url = driver.current_url
-        if "TerminBuchen/logout" in curr_url: # we've timed out, restart
-            InitialiseSession(driver, config)
+    try:
+        # No free slots, try again...
+        if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
+            time.sleep(20)
+            driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
             ctr += 1
-        else: # the thing disappeared, we've got a slot?!?!?!?!
-            playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
-            appt_available = True
+            print(f"{datetime.datetime.now()} Clicked the button {ctr} times.")
+        else:
+            curr_url = driver.current_url
+            if "TerminBuchen/logout" in curr_url: # we've timed out, restart
+                print(f"{datetime.datetime.now()} - Session timed out. Restarting...")
+                InitialiseSession(driver, config)
+                ctr += 1
+            else: # the thing disappeared!!
+                print(f"{datetime.datetime.now()} - We got a slot ?!?!?!?!")
+                playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
+                appt_available = True
+    except Exception as e:
+        pass
 
 print(f"Got an appointment after only {time.time() - start_time} seconds! ({ctr} tries).")
            
