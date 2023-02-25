@@ -82,7 +82,7 @@ def InitialiseSession(driver, config) -> bool:
         logging.info("Session initialised.")
         return True
     except Exception as e:
-        logging.warn("InitialiseSession threw exception: {e}")
+        logging.warn(f"InitialiseSession threw exception: {e}")
         return False
 
 config = LoadConfig("config.yaml")
@@ -121,7 +121,7 @@ while (not appt_available):
                     playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
                     appt_available = True
         except Exception as e:
-            logging.warn("Loop threw exception: {e}")
+            logging.warn(f"Loop threw exception: {e}")
             pass
 
 print(f"Got an appointment after only {time.time() - start_time} seconds! ({ctr} tries).")
