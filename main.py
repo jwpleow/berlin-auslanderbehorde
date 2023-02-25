@@ -18,7 +18,7 @@ def LoadConfig(filename : str):
         config = yaml.safe_load(f)
     logging.info(f"Config: {config}")
         
-    if not all(keys in config for keys in ("appt_link", "nationality")):
+    if not all(keys in config for keys in ("appt_link", "nationality", "employment_section", "chrome_driver_path")):
         logging.error(f"Missing keys in yaml config!")
         exit()
 
@@ -26,11 +26,13 @@ def LoadConfig(filename : str):
 
 def LaunchChrome():
     options = webdriver.ChromeOptions()
+    # If you have a non-default chrome install
     # options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
-    service = Service(r"D:\Downloads\chromedriver_win32\chromedriver.exe")
+    service = Service(os.path.normpath(config["chrome_driver_path"]))
 
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("detach", True)
+    # Idky but firefox/edge both get autologged out instantly by the auslanderberhorde page
     driver = webdriver.Chrome(options=options, service=service)
     return driver
 
@@ -94,6 +96,8 @@ initialised : bool = False
 ctr : int = 0
 
 while (not appt_available):
+    session_start_time = time.time()
+    logging.info("Initialising session...")
     initialised = InitialiseSession(driver, config)
     ctr += 1
     if not initialised:
@@ -106,6 +110,8 @@ while (not appt_available):
                 time.sleep(20)
                 ctr += 1
                 logging.info(f"Button pressed {ctr} times.")
+                if (time.time() - session_start_time > 20 * 60): # Reset ourselves after 20 minutes, so we don't get possibly get a slot with too little time left
+                    break
             else:
                 curr_url = driver.current_url
                 if "TerminBuchen/logout" in curr_url: # we've timed out, restart

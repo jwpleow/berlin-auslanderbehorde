@@ -2,5 +2,5 @@
 appt_link : "https://otv.verwalt-berlin.de/ams/TerminBuchen/wizardng"
 nationality : "Singapur"
 employment_section: "18d"
-
+chrome_driver_path: "D:/Downloads/chromedriver_win32/chromedriver.exe"
 
