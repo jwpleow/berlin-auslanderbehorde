@@ -11,7 +11,7 @@ import os
 import time
 import datetime
 import logging
-logging.basicConfig(format='%(asctime)s %(message)s')
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
 def LoadConfig(filename : str):
     with open(filename, 'r') as f:
