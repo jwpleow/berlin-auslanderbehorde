@@ -36,7 +36,7 @@ def InitialiseSession(driver, config):
     # Open main appointment page
     driver.get(config["appt_link"])
 
-    time.sleep(10)
+    time.sleep(20)
 
     # Click the accept terms and conditions checkbox
     driver.find_element(By.ID, "xi-cb-1").click()
@@ -44,7 +44,7 @@ def InitialiseSession(driver, config):
 
     # Click on next button
     driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-    time.sleep(10)
+    time.sleep(15)
 
     # Set nationality
     nationality_select = Select(driver.find_element(By.ID, 'xi-sel-400'))
@@ -75,7 +75,7 @@ def InitialiseSession(driver, config):
 
     # Click Proceed (first time)
     driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-    time.sleep(10)
+    time.sleep(15)
 
 start_time = time.time()
 config = LoadConfig("config.yaml")
