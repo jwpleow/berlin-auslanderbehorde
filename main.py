@@ -1,42 +1,102 @@
 import yaml
 
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.select import Select
 
-from selenium.common.exceptions import TimeoutException
 import time
 
-import utilities
 
-with open("config.yaml", 'r') as f:
-    config = yaml.safe_load(f)
+def LoadConfig(filename : str):
+    with open(filename, 'r') as f:
+        config = yaml.safe_load(f)
+    print(f"Config: {config}")
+        
+    if not all(keys in config for keys in ("appt_link", "nationality")):
+        print(f"Missing keys in yaml config!")
+        exit()
 
-print(f"Config: {config}")
+    return config
 
-if not all(keys in config for keys in ("appt_link", )):
-    print(f"Missing keys in yaml config!")
-    exit()
+def LaunchChrome():
+    options = webdriver.ChromeOptions()
+    options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
+    service = Service(r"D:\Downloads\chromedriver_win32\chromedriver.exe")
 
-# options = webdriver.FirefoxOptions()
-options = webdriver.ChromeOptions()
-options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
-service = Service(r"D:\Downloads\chromedriver_win32\chromedriver.exe")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("detach", True)
+    driver = webdriver.Chrome(options=options, service=service)
+    return driver
 
-options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_experimental_option("detach", True)
-driver = webdriver.Chrome(options=options, service=service)
+def InitialiseSession(driver, config):
+    # Open main appointment page
+    driver.get(config["appt_link"])
 
-# Open main appointment page
-driver.get(config["appt_link"])
+    time.sleep(10)
 
-time.sleep(15)
-# # Click the checkbox
-driver.find_element(By.ID, "xi-cb-1").click()
-print("Clicked checkbox")
+    # Click the accept terms and conditions checkbox
+    driver.find_element(By.ID, "xi-cb-1").click()
+    print("Clicked checkbox")
+
+    # Click on next button
+    driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+    time.sleep(10)
+
+    # Set nationality
+    nationality_select = Select(driver.find_element(By.ID, 'xi-sel-400'))
+    nationality_select.select_by_visible_text(config["nationality"])
+    time.sleep(2)
+
+    # Set number of people
+    people_select = Select(driver.find_element(By.ID, 'xi-sel-422'))
+    people_select.select_by_visible_text("eine Person") # "eine Person", "zwei Personen", "drei Personen", ...
+    time.sleep(2)
+
+    # Family select
+    family_select = Select(driver.find_element(By.ID, 'xi-sel-427'))
+    family_select.select_by_visible_text("nein") # "ja" / "nein"
+    time.sleep(2)
+
+    # Click apply for residence permit
+    driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[1]/label").click()
+    time.sleep(2)
+
+    # Drop down Erwerbstätigkeit
+    driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[6]/div/div[3]").click()
+    time.sleep(2)
+
+    # Click employment section
+    driver.find_element(By.XPATH, f"//*[contains(text(), '{config['employment_section']}')]").click()
+    time.sleep(5)
+
+    # Click Proceed (first time)
+    driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+    time.sleep(10)
+
+config = LoadConfig("config.yaml")
+driver = LaunchChrome()
+
+InitialiseSession(driver, config)
+
+appt_available : bool = False
+while (not appt_available):
+    # No free slots, try again...
+    if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
+        time.sleep(20)
+        driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+    else:
+        curr_url = driver.current_url
+        if "TerminBuchen/logout" in curr_url: # we've timed out, restart
+            InitialiseSession(driver, config)
+        else: # the thing disappeared, we've got a slot?!?!?!?!
+            pass
 
 
+
+
+
+# print("Done")
 # elem = utilities.WaitForElementID(driver, "xi-cb-1", 20)
 
 
