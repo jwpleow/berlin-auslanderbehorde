@@ -10,21 +10,23 @@ import os
 
 import time
 import datetime
+import logging
+logging.basicConfig(format='%(asctime)s %(message)s')
 
 def LoadConfig(filename : str):
     with open(filename, 'r') as f:
         config = yaml.safe_load(f)
-    print(f"Config: {config}")
+    logging.info(f"Config: {config}")
         
     if not all(keys in config for keys in ("appt_link", "nationality")):
-        print(f"Missing keys in yaml config!")
+        logging.error(f"Missing keys in yaml config!")
         exit()
 
     return config
 
 def LaunchChrome():
     options = webdriver.ChromeOptions()
-    options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
+    # options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
     service = Service(r"D:\Downloads\chromedriver_win32\chromedriver.exe")
 
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -32,79 +34,95 @@ def LaunchChrome():
     driver = webdriver.Chrome(options=options, service=service)
     return driver
 
-def InitialiseSession(driver, config):
-    # Open main appointment page
-    driver.get(config["appt_link"])
+def InitialiseSession(driver, config) -> bool:
+    try:
+        # Open main appointment page
+        driver.get(config["appt_link"])
 
-    time.sleep(20)
+        time.sleep(20)
 
-    # Click the accept terms and conditions checkbox
-    driver.find_element(By.ID, "xi-cb-1").click()
-    print("Clicked checkbox")
+        # Click the accept terms and conditions checkbox
+        driver.find_element(By.ID, "xi-cb-1").click()
 
-    # Click on next button
-    driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-    time.sleep(15)
+        # Click on next button
+        driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+        time.sleep(15)
 
-    # Set nationality
-    nationality_select = Select(driver.find_element(By.ID, 'xi-sel-400'))
-    nationality_select.select_by_visible_text(config["nationality"])
-    time.sleep(2)
+        # Set nationality
+        nationality_select = Select(driver.find_element(By.ID, 'xi-sel-400'))
+        nationality_select.select_by_visible_text(config["nationality"])
+        time.sleep(2)
 
-    # Set number of people
-    people_select = Select(driver.find_element(By.ID, 'xi-sel-422'))
-    people_select.select_by_visible_text("eine Person") # "eine Person", "zwei Personen", "drei Personen", ...
-    time.sleep(2)
+        # Set number of people
+        people_select = Select(driver.find_element(By.ID, 'xi-sel-422'))
+        people_select.select_by_visible_text("eine Person") # "eine Person", "zwei Personen", "drei Personen", ...
+        time.sleep(2)
 
-    # Family select
-    family_select = Select(driver.find_element(By.ID, 'xi-sel-427'))
-    family_select.select_by_visible_text("nein") # "ja" / "nein"
-    time.sleep(2)
+        # Family select
+        family_select = Select(driver.find_element(By.ID, 'xi-sel-427'))
+        family_select.select_by_visible_text("nein") # "ja" / "nein"
+        time.sleep(2)
 
-    # Click apply for residence permit
-    driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[1]/label").click()
-    time.sleep(2)
+        # Click apply for residence permit
+        driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[1]/label").click()
+        time.sleep(2)
 
-    # Drop down Erwerbstätigkeit
-    driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[6]/div/div[3]").click()
-    time.sleep(2)
+        # Drop down Erwerbstätigkeit
+        driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[6]/div/div[3]").click()
+        time.sleep(2)
 
-    # Click employment section
-    driver.find_element(By.XPATH, f"//*[contains(text(), '{config['employment_section']}')]").click()
-    time.sleep(5)
+        # Click employment section
+        driver.find_element(By.XPATH, f"//*[contains(text(), '{config['employment_section']}')]").click()
+        time.sleep(5)
 
-    # Click Proceed (first time)
-    driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-    time.sleep(15)
+        # Click Proceed (first time)
+        driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+        time.sleep(20)
 
-start_time = time.time()
+        logging.info("Session initialised.")
+        return True
+    except Exception as e:
+        logging.warn("InitialiseSession threw exception: {e}")
+        return False
+
 config = LoadConfig("config.yaml")
 driver = LaunchChrome()
 
-InitialiseSession(driver, config)
-
+start_time = time.time()
 appt_available : bool = False
-ctr = 1
+initialised : bool = False
+ctr : int = 0
+
 while (not appt_available):
-    try:
-        # No free slots, try again...
-        if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
-            time.sleep(20)
-            driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-            ctr += 1
-            print(f"{datetime.datetime.now()} Clicked the button {ctr} times.")
-        else:
-            curr_url = driver.current_url
-            if "TerminBuchen/logout" in curr_url: # we've timed out, restart
-                print(f"{datetime.datetime.now()} - Session timed out. Restarting...")
-                InitialiseSession(driver, config)
+    initialised = InitialiseSession(driver, config)
+    ctr += 1
+    if not initialised:
+        continue
+    while (not appt_available):
+        try:
+            # No free slots, try again...
+            if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
+                driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+                time.sleep(20)
                 ctr += 1
-            else: # the thing disappeared!!
-                print(f"{datetime.datetime.now()} - We got a slot ?!?!?!?!")
-                playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
-                appt_available = True
-    except Exception as e:
-        pass
+                logging.info(f"Button pressed {ctr} times.")
+            else:
+                curr_url = driver.current_url
+                if "TerminBuchen/logout" in curr_url: # we've timed out, restart
+                    logging.info("Session timed out. Restarting...")
+                    break
+                else: # the thing disappeared?
+                    # Double check that the page has fully loaded
+                    print(f"{datetime.datetime.now()} - We got a slot ?!?!?!?!")
+                    logging.info("We got a slot ?!?!?!?!")
+                    time.sleep(30) # Sleep some more just to double check that the page has loaded
+                    if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
+                        continue
+                    playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
+                    appt_available = True
+        except Exception as e:
+            logging.warn("Loop threw exception: {e}")
+            pass
 
 print(f"Got an appointment after only {time.time() - start_time} seconds! ({ctr} tries).")
            
