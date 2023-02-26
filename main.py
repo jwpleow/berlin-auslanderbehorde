@@ -87,6 +87,10 @@ def InitialiseSession(driver, config) -> bool:
         logging.warn(f"InitialiseSession threw exception: {e}")
         return False
 
+def NoSlotsAvailableMessageBoxIsPresent(driver) -> bool:
+    messageBoxes = driver.find_elements(By.ID, "messagesBox")
+    return any("Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in boxes.text for boxes in messageBoxes)
+    
 config = LoadConfig("config.yaml")
 driver = LaunchChrome()
 
@@ -105,13 +109,13 @@ while (not appt_available):
     while (not appt_available):
         try:
             # No free slots, try again...
-            if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
+            if NoSlotsAvailableMessageBoxIsPresent(driver):
+                if (time.time() - session_start_time > 20 * 60): # Reset ourselves after 20 minutes, so we don't get possibly get a slot with too little time left
+                    break
                 driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
                 time.sleep(20)
                 ctr += 1
                 logging.info(f"Button pressed {ctr} times.")
-                if (time.time() - session_start_time > 20 * 60): # Reset ourselves after 20 minutes, so we don't get possibly get a slot with too little time left
-                    break
             else:
                 curr_url = driver.current_url
                 if "TerminBuchen/logout" in curr_url: # we've timed out, restart
@@ -121,8 +125,9 @@ while (not appt_available):
                     # Double check that the page has fully loaded
                     print(f"{datetime.datetime.now()} - We got a slot ?!?!?!?!")
                     logging.info("We got a slot ?!?!?!?!")
-                    time.sleep(30) # Sleep some more just to double check that the page has loaded
-                    if "Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in driver.find_element(By.ID, "messagesBox").text:
+                    time.sleep(30) # Sleep some more just to double check that the page has loaded (TODO: think of better method)
+                    if NoSlotsAvailableMessageBoxIsPresent(driver):
+                        logging.info("Oh its a false positive")
                         continue
                     playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
                     appt_available = True
