@@ -27,7 +27,7 @@ def LoadConfig(filename : str):
 def LaunchChrome():
     options = webdriver.ChromeOptions()
     # If you have a non-default chrome install
-    options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
+    # options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
     service = Service(os.path.normpath(config["chrome_driver_path"]))
 
     options.add_argument("--disable-blink-features=AutomationControlled")
