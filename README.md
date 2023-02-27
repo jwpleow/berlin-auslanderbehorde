@@ -11,3 +11,8 @@ pip install -r requirements.txt
 ```
 python main.py
 ```
+
+# Notes:
+What the appointment page looks like for reference (as of 2023/02/07):
+
+![alt text](https://github.com/jwpleow/berlin-auslanderberhorde/blob/master/docs/apptpage.jpg "Appointment Page")  
