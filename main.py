@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.select import Select
+from selenium.webdriver.support import expected_conditions
 
 import playsound
 import os
@@ -11,7 +12,6 @@ import os
 import time
 import datetime
 import logging
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
 def LoadConfig(filename : str):
     with open(filename, 'r') as f:
@@ -27,7 +27,7 @@ def LoadConfig(filename : str):
 def LaunchChrome():
     options = webdriver.ChromeOptions()
     # If you have a non-default chrome install
-    # options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
+    options.binary_location = r"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe"
     service = Service(os.path.normpath(config["chrome_driver_path"]))
 
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -36,75 +36,156 @@ def LaunchChrome():
     driver = webdriver.Chrome(options=options, service=service)
     return driver
 
+def BypassAlerts(driver):
+    try: 
+        alert = driver.switch_to.alert # will throw if no alert
+        alert.accept()
+    except:
+        pass
+
+# Returns false if timeout hit
+# Checks every 1s
+def WaitForText(driver, elementPartialText : str, timeoutSecs : float) -> bool:
+    startTime = time.time()
+    while (time.time() - startTime) < timeoutSecs:
+        foundElems = driver.find_elements(By.XPATH, f"//*[contains(text(), '{elementPartialText}')]")
+        if len(foundElems) > 0:
+            logging.info(f"Found element of {elementPartialText}")
+            return True
+        time.sleep(1)
+
+    return False
+
+# Uses find_element
+# Returns false if timed out
+def WaitForElement(driver, searchBy, searchValue, timeoutSecs: float) -> bool:
+    startTime = time.time()
+    while (time.time() - startTime) < timeoutSecs:
+        try:
+            driver.find_element(searchBy, searchValue)
+            return True
+        except:
+            pass
+        time.sleep(1)
+    return False
+
+# Returns false if timed out
+def WaitAndClickElement(driver, searchBy, searchValue, timeoutSecs: float) -> bool:
+    startTime = time.time()
+    while (time.time() - startTime) < timeoutSecs:
+        try:
+            driver.find_element(searchBy, searchValue).click()
+            return True
+        except:
+            pass
+        time.sleep(0.5)
+    return False
+
+def WaitAndSelectByVisibleText(driver, searchBy, searchValue: str, selectText: str, timeoutSecs: float) -> bool:
+    startTime = time.time()
+    while (time.time() - startTime) < timeoutSecs:
+        try:
+            selector = Select(driver.find_element(searchBy, searchValue))
+            selector.select_by_visible_text(selectText)
+            return True
+        except:
+            pass
+        time.sleep(0.5)
+    return False
+
 def InitialiseSession(driver, config) -> bool:
     try:
         # Open main appointment page
         driver.get(config["appt_link"])
-
-        time.sleep(20)
+        time.sleep(1)
+        BypassAlerts(driver)
 
         # Click the accept terms and conditions checkbox
-        driver.find_element(By.ID, "xi-cb-1").click()
+        if not WaitAndClickElement(driver, By.ID, "xi-cb-1", 40):
+            logging.warning("Timed out waiting for start page")
+            return False
+        # driver.find_element(By.ID, "xi-cb-1").click()
 
         # Click on next button
         driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-        time.sleep(15)
-
+        
         # Set nationality
-        nationality_select = Select(driver.find_element(By.ID, 'xi-sel-400'))
-        nationality_select.select_by_visible_text(config["nationality"])
-        time.sleep(2)
+        if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-400', config["nationality"], 40):
+            logging.warning("Timed out waiting for nationality dialogue")
+            return False
 
-        # Set number of people
-        people_select = Select(driver.find_element(By.ID, 'xi-sel-422'))
-        people_select.select_by_visible_text("eine Person") # "eine Person", "zwei Personen", "drei Personen", ...
-        time.sleep(2)
+        time.sleep(1) # if we don't sleep in between these calls a million boxes will spawn for some reason
+
+        # number of people select
+        if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-422', "eine Person", 10):
+            logging.warning("Timed out waiting for number of people dialogue")
+            return False
+        
+        time.sleep(1)
 
         # Family select
-        family_select = Select(driver.find_element(By.ID, 'xi-sel-427'))
-        family_select.select_by_visible_text("nein") # "ja" / "nein"
-        time.sleep(2)
+        if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-427', "nein", 10): # "ja" / "nein"
+            logging.warning("Timed out waiting for family dialogue")
+            return False
+
+        time.sleep(5) 
 
         # Click apply for residence permit
-        driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[1]/label").click()
-        time.sleep(2)
+        if not WaitAndClickElement(driver, By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[1]/label", 20):
+            logging.warning("Timed out waiting for residence permit boxes")
+            return False
 
         # Drop down Erwerbstätigkeit
-        driver.find_element(By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[6]/div/div[3]").click()
-        time.sleep(2)
+        if not WaitAndClickElement(driver, By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[6]/div/div[3]", 20):
+            logging.warning("Timed out waiting for Drop down Erwerbstätigkeit")
+            return False
 
         # Click employment section
-        driver.find_element(By.XPATH, f"//*[contains(text(), '{config['employment_section']}')]").click()
+        if not WaitAndClickElement(driver, By.XPATH, f"//*[contains(text(), '{config['employment_section']}')]", 20):
+            logging.warning("Timed out waiting for Drop down Erwerbstätigkeit")
+            return False
+        
         time.sleep(5)
 
         # Click Proceed (first time)
         driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-        time.sleep(20)
 
         logging.info("Session initialised.")
         return True
     except Exception as e:
-        logging.warn(f"InitialiseSession threw exception: {e}")
+        logging.warning(f"InitialiseSession threw exception: {e}")
         return False
 
-def OnAngabenPage(driver) -> bool:
-    dataTitleBox = driver.find_elements(By.PARTIAL_LINK_TEXT)
 
-def NoSlotsAvailableMessageBoxPage(driver) -> bool:
-    
-    messageBoxes = driver.find_elements(By.ID, "messagesBox")
-    return any("Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in boxes.text for boxes in messageBoxes)
-    
-# def SelectionDateTextVisible(driver) -> bool:
-#     elems = driver.find_elements(By.)
-
-# Returns true if we got through
-# False if timed out or No slots available message appeared
-def CheckIfAppointmentSlotPageAppeared(timeout: float) -> bool:
+# Returns true if we've loaded onto the appt page 
+# Returns false when we get the no appt message OR timeout
+def OnApptPage(driver, timeoutSecs: float) -> bool:
     startTime = time.time()
-    while time.time() - startTime < timeout:
-        
+
+    while (time.time() - startTime) < timeoutSecs:
+        try:
+            # appt page has "Ausgewählte Dienstleistung" at the top
+            apptPageElem = driver.find_elements(By.XPATH, f"//*[contains(text(), 'Ausgewählte Dienstleistung')]")
+            if len(apptPageElem) > 0:
+                logging.info(f"Found Ausgewählte Dienstleistung - There's an appointment?!")
+                return True
+            
+            # Check if we've got the no appt available message
+            noApptMessageBoxes = driver.find_elements(By.ID, "messagesBox")
+            noSlotsAvailable : bool = any("Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in boxes.text for boxes in noApptMessageBoxes)
+            if noSlotsAvailable:
+                return False
+        except:
+            pass
+        time.sleep(0.5)
     return False
+   
+
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
+
+for mediapath in ["media/success_alarm.mp3", "media/error.mp3"]:
+    if not os.path.isfile(os.path.abspath(mediapath)):
+        raise RuntimeError(f"Cannot find {mediapath}. Are you running from the root folder?")
 
 config = LoadConfig("config.yaml")
 driver = LaunchChrome()
@@ -113,42 +194,57 @@ start_time = time.time()
 appt_available : bool = False
 initialised : bool = False
 ctr : int = 0
+failCtr : int = 0
 
 while (not appt_available):
     session_start_time = time.time()
     logging.info("Initialising session...")
     initialised = InitialiseSession(driver, config)
+    failCtr += 1
     ctr += 1
     if not initialised:
         continue
+
+    if failCtr > 100:
+        logging.error("We've failed too often... please feedback")
+        try:
+            # This may fail and throw an exception
+            # play a sound in case we fail too much
+            for i in range(5):
+                playsound.playsound(os.path.abspath("media/error.mp3"))
+        except Exception as e:
+            logging.warn(f"{str(e)}")
+            pass
+        exit()
+
     while (not appt_available):
         try:
-            # No free slots, try again...
-            if NoSlotsAvailableMessageBoxIsPresent(driver):
+            if OnApptPage(driver, 60):
+                logging.info(f"We got a slot ?!?!?!?!")
+                try:
+                    # This may fail and throw an exception
+                    playsound.playsound(os.path.abspath("media/success_alarm.mp3"))
+                except Exception as e:
+                    exit()
+                appt_available = True
+            else:
                 if (time.time() - session_start_time > 20 * 60): # Reset ourselves after 20 minutes, so we don't get possibly get a slot with too little time left
                     break
-                driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
-                time.sleep(20)
-                ctr += 1
-                logging.info(f"Button pressed {ctr} times.")
-            else:
+
                 curr_url = driver.current_url
                 if "TerminBuchen/logout" in curr_url: # we've timed out, restart
                     logging.info("Session timed out. Restarting...")
                     break
-                else: # the thing disappeared?
-                    # Double check that the page has fully loaded
-                    print(f"{datetime.datetime.now()} - We got a slot ?!?!?!?!")
-                    logging.info("We got a slot ?!?!?!?!")
-                    time.sleep(30) # Sleep some more just to double check that the page has loaded (TODO: think of better method)
-                    if NoSlotsAvailableMessageBoxIsPresent(driver):
-                        logging.info("Oh its a false positive")
-                        continue
-                    playsound.playsound(f"{os.path.dirname(__file__)}/ringtone-126505.mp3")
-                    appt_available = True
+
+                if not WaitAndClickElement(driver, By.ID, "applicationForm:managedForm:proceed", 60):
+                    logging.warning("Timed out waiting for Weiter button in main loop")
+                    initialised = False
+                ctr += 1
+                logging.info(f"Button pressed {ctr} times.")
+
         except Exception as e:
             logging.warn(f"Loop threw exception: {e}")
-            pass
+            break
 
 print(f"Got an appointment after only {time.time() - start_time} seconds! ({ctr} tries).")
            
