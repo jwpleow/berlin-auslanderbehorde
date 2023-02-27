@@ -87,10 +87,25 @@ def InitialiseSession(driver, config) -> bool:
         logging.warn(f"InitialiseSession threw exception: {e}")
         return False
 
-def NoSlotsAvailableMessageBoxIsPresent(driver) -> bool:
+def OnAngabenPage(driver) -> bool:
+    dataTitleBox = driver.find_elements(By.PARTIAL_LINK_TEXT)
+
+def NoSlotsAvailableMessageBoxPage(driver) -> bool:
+    
     messageBoxes = driver.find_elements(By.ID, "messagesBox")
     return any("Für die gewählte Dienstleistung sind aktuell keine Termine frei! Bitte" in boxes.text for boxes in messageBoxes)
     
+# def SelectionDateTextVisible(driver) -> bool:
+#     elems = driver.find_elements(By.)
+
+# Returns true if we got through
+# False if timed out or No slots available message appeared
+def CheckIfAppointmentSlotPageAppeared(timeout: float) -> bool:
+    startTime = time.time()
+    while time.time() - startTime < timeout:
+        
+    return False
+
 config = LoadConfig("config.yaml")
 driver = LaunchChrome()
 
