@@ -36,21 +36,21 @@ def LaunchChrome():
     driver = webdriver.Chrome(options=options, service=service)
     return driver
 
-def BypassAlerts(driver):
+def BypassAlerts(driver: webdriver.Chrome):
     try: 
         alert = driver.switch_to.alert # will throw if no alert
         alert.accept()
     except:
         pass
 
-def CheckForInternalServerError(driver) -> bool:
+def CheckForInternalServerError(driver: webdriver.Chrome) -> bool:
     # Internal server error?
     errorMsgs = driver.find_elements(By.XPATH, f"//*[contains(text(), 'Internal Server Error')]")
     return len(errorMsgs) > 0
 
 # Returns false if timeout hit
 # Checks every 1s
-def WaitForText(driver, elementPartialText : str, timeoutSecs : float) -> bool:
+def WaitForText(driver: webdriver.Chrome, elementPartialText : str, timeoutSecs : float) -> bool:
     startTime = time.time()
     while (time.time() - startTime) < timeoutSecs:
         foundElems = driver.find_elements(By.XPATH, f"//*[contains(text(), '{elementPartialText}')]")
@@ -63,7 +63,7 @@ def WaitForText(driver, elementPartialText : str, timeoutSecs : float) -> bool:
 
 # Uses find_element
 # Returns false if timed out
-def WaitForElement(driver, searchBy, searchValue, timeoutSecs: float) -> bool:
+def WaitForElement(driver: webdriver.Chrome, searchBy, searchValue, timeoutSecs: float) -> bool:
     startTime = time.time()
     while (time.time() - startTime) < timeoutSecs:
         try:
@@ -75,7 +75,7 @@ def WaitForElement(driver, searchBy, searchValue, timeoutSecs: float) -> bool:
     return False
 
 # Returns false if timed out
-def WaitAndClickElement(driver, searchBy, searchValue, timeoutSecs: float) -> bool:
+def WaitAndClickElement(driver: webdriver.Chrome, searchBy, searchValue, timeoutSecs: float) -> bool:
     startTime = time.time()
     while (time.time() - startTime) < timeoutSecs:
         try:
@@ -91,7 +91,7 @@ def WaitAndClickElement(driver, searchBy, searchValue, timeoutSecs: float) -> bo
         time.sleep(0.5)
     return False
 
-def WaitAndSelectByVisibleText(driver, searchBy, searchValue: str, selectText: str, timeoutSecs: float) -> bool:
+def WaitAndSelectByVisibleText(driver: webdriver.Chrome, searchBy, searchValue: str, selectText: str, timeoutSecs: float) -> bool:
     startTime = time.time()
     while (time.time() - startTime) < timeoutSecs:
         try:
@@ -103,11 +103,20 @@ def WaitAndSelectByVisibleText(driver, searchBy, searchValue: str, selectText: s
         time.sleep(0.5)
     return False
 
-def SelectFirstAppt(driver, searchBy, searchValue: str, timeoutSecs: float) -> bool:
+def SelectFirstAppt(driver: webdriver.Chrome, timeoutSecs: float) -> bool:
     startTime = time.time()
     while (time.time() - startTime) < timeoutSecs:
         try:
-            selector = Select(driver.find_element(searchBy, searchValue))
+            
+            dateForm = driver.find_element(By.CSS_SELECTOR, "[data-handler=selectDay]")
+            day = dateForm.text
+            month = dateForm.get_attribute("data-month")
+            year = dateForm.get_attribute("data-year")
+            logging.info(f"Apptmt available on {day}-{month}-{year}")
+            dateForm.click()
+            time.sleep(1)
+
+            selector = Select(driver.find_element(By.ID, "xi-sel-3"))
             alloptions = selector.options
             for option in alloptions:
                 print(f"OPTIONS AVAILABLE IN APPT: {option.text}") 
@@ -122,7 +131,7 @@ def SelectFirstAppt(driver, searchBy, searchValue: str, timeoutSecs: float) -> b
     return False
         
 
-def InitialiseSession(driver, config) -> bool:
+def InitialiseSession(driver: webdriver.Chrome, config) -> bool:
     try:
         # Open main appointment page
         driver.get(config["appt_link"])
@@ -190,7 +199,7 @@ def InitialiseSession(driver, config) -> bool:
 
 # Returns true if we've loaded onto the appt page 
 # Returns false when we get the no appt message OR timeout
-def OnApptPage(driver, timeoutSecs: float) -> bool:
+def OnApptPage(driver: webdriver.Chrome, timeoutSecs: float) -> bool:
     startTime = time.time()
 
     while (time.time() - startTime) < timeoutSecs:
@@ -260,7 +269,7 @@ while (not appt_available):
                 try:
                     # Bring window to foreground
                     driver.switch_to.window(driver.current_window_handle)
-                    # SelectFirstAppt(driver, By.ID, "xi-sel-3", 20)
+                    SelectFirstAppt(driver, 20)
                     # This may fail and throw an exception
                     playsound.playsound(os.path.abspath("media/success_alarm.mp3"))
                 except Exception as e:
