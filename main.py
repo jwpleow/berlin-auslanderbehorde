@@ -43,6 +43,11 @@ def BypassAlerts(driver):
     except:
         pass
 
+def CheckForInternalServerError(driver) -> bool:
+    # Internal server error?
+    errorMsgs = driver.find_elements(By.XPATH, f"//*[contains(text(), 'Internal Server Error')]")
+    return len(errorMsgs) > 0
+
 # Returns false if timeout hit
 # Checks every 1s
 def WaitForText(driver, elementPartialText : str, timeoutSecs : float) -> bool:
@@ -74,6 +79,11 @@ def WaitAndClickElement(driver, searchBy, searchValue, timeoutSecs: float) -> bo
     startTime = time.time()
     while (time.time() - startTime) < timeoutSecs:
         try:
+            # Internal server error?
+            if CheckForInternalServerError(driver):
+                logging.error("Internal server error during WaitAndClickElement!")
+                return False
+        
             driver.find_element(searchBy, searchValue).click()
             return True
         except:
@@ -93,6 +103,25 @@ def WaitAndSelectByVisibleText(driver, searchBy, searchValue: str, selectText: s
         time.sleep(0.5)
     return False
 
+def SelectFirstAppt(driver, searchBy, searchValue: str, timeoutSecs: float) -> bool:
+    startTime = time.time()
+    while (time.time() - startTime) < timeoutSecs:
+        try:
+            selector = Select(driver.find_element(searchBy, searchValue))
+            alloptions = selector.options
+            for option in alloptions:
+                print(f"OPTIONS AVAILABLE IN APPT: {option.text}") 
+            selector.select_by_index(0)
+            time.sleep(0.5)
+            driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
+            # selector.select_by_visible_text(selectText)
+            return True
+        except:
+            pass
+        time.sleep(0.5)
+    return False
+        
+
 def InitialiseSession(driver, config) -> bool:
     try:
         # Open main appointment page
@@ -101,7 +130,7 @@ def InitialiseSession(driver, config) -> bool:
         BypassAlerts(driver)
 
         # Click the accept terms and conditions checkbox
-        if not WaitAndClickElement(driver, By.ID, "xi-cb-1", 40):
+        if not WaitAndClickElement(driver, By.ID, "xi-cb-1", 60):
             logging.warning("Timed out waiting for start page")
             return False
         # driver.find_element(By.ID, "xi-cb-1").click()
@@ -110,39 +139,41 @@ def InitialiseSession(driver, config) -> bool:
         driver.find_element(By.ID, "applicationForm:managedForm:proceed").click()
         
         # Set nationality
-        if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-400', config["nationality"], 40):
+        if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-400', config["nationality"], 60):
             logging.warning("Timed out waiting for nationality dialogue")
             return False
 
-        time.sleep(1) # if we don't sleep in between these calls a million boxes will spawn for some reason
+        time.sleep(2) # if we don't sleep in between these calls a million boxes will spawn for some reason
 
         # number of people select
         if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-422', "eine Person", 10):
             logging.warning("Timed out waiting for number of people dialogue")
             return False
         
-        time.sleep(1)
+        time.sleep(2)
 
         # Family select
         if not WaitAndSelectByVisibleText(driver, By.ID, 'xi-sel-427', "nein", 10): # "ja" / "nein"
             logging.warning("Timed out waiting for family dialogue")
             return False
 
-        time.sleep(5) 
+        time.sleep(3) 
 
         # Click apply for residence permit
         if not WaitAndClickElement(driver, By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[1]/label", 20):
             logging.warning("Timed out waiting for residence permit boxes")
             return False
+        
+        time.sleep(2)
 
         # Drop down Erwerbstätigkeit
-        if not WaitAndClickElement(driver, By.XPATH, "/html/body/div[2]/div[2]/div[4]/div[2]/form/div[2]/div/div[2]/div[8]/div[2]/div[2]/div[1]/fieldset/div[8]/div[1]/div[1]/div[1]/div[6]/div/div[3]", 20):
+        if not WaitAndClickElement(driver, By.XPATH, f"//*[contains(text(), 'Erwerbstätigkeit')]", 20):
             logging.warning("Timed out waiting for Drop down Erwerbstätigkeit")
             return False
 
         # Click employment section
         if not WaitAndClickElement(driver, By.XPATH, f"//*[contains(text(), '{config['employment_section']}')]", 20):
-            logging.warning("Timed out waiting for Drop down Erwerbstätigkeit")
+            logging.warning("Timed out waiting to click the section for employment reason thing")
             return False
         
         time.sleep(5)
@@ -169,6 +200,11 @@ def OnApptPage(driver, timeoutSecs: float) -> bool:
             if len(apptPageElem) > 0:
                 logging.info(f"Found Ausgewählte Dienstleistung - There's an appointment?!")
                 return True
+            
+            # Internal server error?
+            if CheckForInternalServerError(driver):
+                logging.error("Internal server error during OnApptPage!")
+                return False
             
             # Check if we've got the no appt available message
             noApptMessageBoxes = driver.find_elements(By.ID, "messagesBox")
@@ -224,6 +260,7 @@ while (not appt_available):
                 try:
                     # Bring window to foreground
                     driver.switch_to.window(driver.current_window_handle)
+                    # SelectFirstAppt(driver, By.ID, "xi-sel-3", 20)
                     # This may fail and throw an exception
                     playsound.playsound(os.path.abspath("media/success_alarm.mp3"))
                 except Exception as e:
