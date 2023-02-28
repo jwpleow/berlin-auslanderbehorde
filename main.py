@@ -222,6 +222,8 @@ while (not appt_available):
             if OnApptPage(driver, 60):
                 logging.info(f"We got a slot ?!?!?!?!")
                 try:
+                    # Bring window to foreground
+                    driver.switch_to.window(driver.current_window_handle)
                     # This may fail and throw an exception
                     playsound.playsound(os.path.abspath("media/success_alarm.mp3"))
                 except Exception as e:
